@@ -12,6 +12,29 @@ module.exports=function(app,db){
    WHERE p.id=$1 AND p.company_id=$2 AND a.user_id=$3`,[projectId,company(req),user(req)]);
   return r.rows[0];
  }
+ // Admin: tilldela och schemalägg i en transaktion. Undvik halvt sparade jobb.
+ app.post('/api/jobs/dispatch',wrap(async(req,res)=>{
+  if(req.user.role!=='admin')return deny(res,403,'Endast administratör');
+  const projectId=validId(req.body?.project_id),userId=validId(req.body?.user_id);
+  const startText=req.body?.start,endText=req.body?.end;
+  if(!projectId||!userId||typeof startText!=='string'||typeof endText!=='string'||
+     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(startText)||
+     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(endText))return deny(res,400,'Ange arbetsorder, anställd och datum/tid');
+  const start=new Date(startText),end=new Date(endText);
+  if(!Number.isFinite(+start)||!Number.isFinite(+end)||end<=start)return deny(res,400,'Sluttiden måste vara efter starttiden');
+  const client=await db.connect();
+  try{
+   await client.query('BEGIN');
+   const {rows:[project]}=await client.query('SELECT id,status FROM projects WHERE id=$1 AND company_id=$2 FOR UPDATE',[projectId,company(req)]);
+   const {rows:[employee]}=await client.query("SELECT id FROM app_users WHERE id=$1 AND company_id=$2 AND active=true AND role IN ('employee','contractor')",[userId,company(req)]);
+   if(!project||!employee||!['open','ongoing','paused'].includes(project.status)){
+    await client.query('ROLLBACK');return deny(res,404,'Aktiv arbetsorder eller anställd saknas');
+   }
+   await client.query('UPDATE projects SET scheduled_start=$3,scheduled_end=$4 WHERE id=$1 AND company_id=$2',[projectId,company(req),start,end]);
+   await client.query('INSERT INTO project_assignments(company_id,project_id,user_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[company(req),projectId,userId]);
+   await client.query('COMMIT');res.status(200).json({ok:true,project_id:projectId,user_id:userId});
+  }catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
+ }));
  // Schemalagda arbetsorder med aktuellt arbetspass och raststatus.
  app.get('/api/staff/jobflow',wrap(async(req,res)=>{
   if(!allowed(req))return deny(res,403,'Endast personal');

@@ -174,9 +174,13 @@ function renderCalendar(){
  if(unscheduled.length)body+=`<div class="unscheduled"><h3>Jobb utan schematid</h3>${unscheduled.map(calendarJobRow).join('')}</div>`;
  $('calendarDayJobs').innerHTML=body;
 }
-function openJobDetail(pid){selectedJobId=pid;jobflowClose();staffNavigate('job')}
+function openJobDetail(pid){
+ const found=jobflowJobs.find(x=>Number(x.id)===Number(pid));
+ if(!found){show('Jobbet kunde inte öppnas. Uppdatera schemat och försök igen.',true);return;}
+ selectedJobId=Number(pid);jobflowClose();staffNavigate('job');
+}
 function renderJobDetail(){
- const j=jobflowJobs.find(x=>x.id===selectedJobId);if(!j){staffNavigate('schedule');return}
+ const j=jobflowJobs.find(x=>Number(x.id)===Number(selectedJobId));if(!j){staffNavigate('schedule');return}
  $('jobDetailTitle').textContent=j.project_number+' – '+j.title;
  $('jobDetailContent').innerHTML=`<div class="job-detail-grid"><div><small>Kund</small><b>${esc(j.customer_name||'Ej angiven')}</b></div><div><small>Adress</small><b>${esc(j.customer_address||'Ej angiven')}</b></div><div><small>Start</small><b>${j.scheduled_start?date(j.scheduled_start):'Ej angiven'}</b></div><div><small>Slut</small><b>${j.scheduled_end?date(j.scheduled_end):'Ej angiven'}</b></div></div><h3>Arbetsbeskrivning</h3><p class="job-description">${esc(j.description||'Ingen beskrivning inlagd.')}</p><p><strong>Status:</strong> ${jobDone(j)?'Avslutat':j.active_break_id?'Rast / paus':j.active_time_id?'Pågående':'Ej startat'}</p>`;
  const active=!!j.active_time_id,paused=!!j.active_break_id,done=jobDone(j);
@@ -187,9 +191,9 @@ async function jobflowRefresh(){
  catch(e){show('Kunde inte hämta schemat: '+e.message,true)}
 }
 async function jobflowStart(pid){try{await api('/api/staff/time/start',{method:'POST',body:JSON.stringify({project_id:pid,work_type:'ordinary'})});show('Projektarbetet startat');await jobflowRefresh();await refresh()}catch(e){show(e.message,true)}}
-async function jobflowBreak(pid,action){const j=jobflowJobs.find(x=>x.id===pid);if(!j||!j.active_time_id)return;try{await api('/api/staff/time/'+j.active_time_id+'/break/'+action,{method:'POST',body:'{}'});show(action==='start'?'Arbetet pausat':'Arbetet fortsätter');await jobflowRefresh()}catch(e){show(e.message,true)}}
+async function jobflowBreak(pid,action){const j=jobflowJobs.find(x=>Number(x.id)===Number(pid));if(!j||!j.active_time_id)return;try{await api('/api/staff/time/'+j.active_time_id+'/break/'+action,{method:'POST',body:'{}'});show(action==='start'?'Arbetet pausat':'Arbetet fortsätter');await jobflowRefresh()}catch(e){show(e.message,true)}}
 function jobflowAddMaterial(){const d=document.createElement('div');d.className='item jobflow-material';d.style='display:grid;grid-template-columns:2fr 1fr 1fr;gap:7px';d.innerHTML='<input class="jm-name" placeholder="Material, t.ex. blandare" maxlength="250"><input class="jm-qty" type="number" min="0.01" step="any" placeholder="Antal"><select class="jm-unit"><option value="st">st</option><option value="m">m</option><option value="m2">m²</option><option value="kg">kg</option><option value="l">l</option><option value="förp">förp</option></select><input class="jm-rsk" placeholder="RSK (valfritt)" maxlength="100"><button class="secondary" onclick="this.parentElement.remove()">Ta bort raden</button>'; $('jobflowMaterials').appendChild(d)}
-function jobflowOpen(pid){const j=jobflowJobs.find(x=>x.id===pid);if(!j||!j.active_time_id||j.active_break_id)return;jobflowSelected=pid;$('jobflowTitle').textContent='Avsluta: '+j.title;$('jobflowDescription').value='';$('jobflowMaterials').innerHTML='';$('jobflowPhotoList').textContent='';$('jobflowError').textContent='';$('jobflowEditor').style.display='block';jobflowAddMaterial();$('jobflowEditor').scrollIntoView({behavior:'smooth'});jobflowLoadPhotos()}
+function jobflowOpen(pid){const j=jobflowJobs.find(x=>Number(x.id)===Number(pid));if(!j||!j.active_time_id||j.active_break_id)return;jobflowSelected=pid;$('jobflowTitle').textContent='Avsluta: '+j.title;$('jobflowDescription').value='';$('jobflowMaterials').innerHTML='';$('jobflowPhotoList').textContent='';$('jobflowError').textContent='';$('jobflowEditor').style.display='block';jobflowAddMaterial();$('jobflowEditor').scrollIntoView({behavior:'smooth'});jobflowLoadPhotos()}
 function jobflowClose(){$('jobflowEditor').style.display='none';jobflowSelected=null}
 async function jobflowUploadPhotos(){if(!jobflowSelected||jobflowBusy)return;const files=Array.from($('jobflowFile').files);if(!files.length)return;jobflowBusy=true;
  try{for(const file of files){if(file.size>2*1024*1024)throw Error('Varje bild får vara högst 2 MB. Minska bildstorleken först.');if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Välj JPG, PNG eller WebP');
