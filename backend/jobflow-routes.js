@@ -22,7 +22,13 @@ module.exports=function(app,db){
    EXISTS (SELECT 1 FROM job_reports r WHERE r.company_id=p.company_id AND r.project_id=p.id AND r.user_id=$2) reported
    FROM project_assignments a JOIN projects p ON p.id=a.project_id AND p.company_id=a.company_id
    LEFT JOIN customers c ON c.id=p.customer_id AND c.company_id=p.company_id
-   WHERE a.company_id=$1 AND a.user_id=$2 ORDER BY p.scheduled_start NULLS LAST,p.id DESC LIMIT 200`,[company(req),user(req)]);
+   WHERE a.company_id=$1 AND a.user_id=$2
+   ORDER BY CASE WHEN p.status IN ('completed','invoiced') OR EXISTS
+      (SELECT 1 FROM job_reports r WHERE r.company_id=p.company_id AND r.project_id=p.id AND r.user_id=$2)
+     THEN 2 WHEN EXISTS
+      (SELECT 1 FROM time_entries t WHERE t.company_id=p.company_id AND t.user_id=$2 AND t.project_id=p.id AND t.check_out IS NULL)
+     THEN 0 ELSE 1 END,
+     p.scheduled_start ASC NULLS LAST, p.id ASC LIMIT 200`,[company(req),user(req)]);
   res.json(rows);
  }));
  // Ladda upp foton (högst 6/person och jobb). Rå bytes, inte lokal disk (Render har flyktigt filsystem).
