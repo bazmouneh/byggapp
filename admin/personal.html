@@ -18,10 +18,28 @@
 .daily-history-entry{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #e2e8f0}
 .daily-history-entry small{display:block}.daily-history-entry strong{text-align:right;white-space:nowrap}
 @media(max-width:430px){.daily-actions{grid-template-columns:1fr}}
+</style><style>
+[hidden]{display:none!important}.staff-nav{background:transparent;box-shadow:none;display:flex;gap:8px;padding:0 0 14px;flex-wrap:wrap;position:static}
+.staff-nav button{background:#e2e8f0;color:#172033;margin:0;flex:1;min-width:100px}.staff-nav button.selected{background:#172033;color:#fff}
+.calendar-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}.calendar-month{display:flex;align-items:center;gap:10px}.calendar-month button{margin:0;font-size:22px}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:14px 0 24px}.calendar-weekday{text-align:center;font-size:12px;font-weight:700;color:#64748b}
+.calendar-date{padding:8px 2px;min-height:58px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#f1f5f9;margin:0;font-size:16px}
+.calendar-date small{font-size:10px;color:#475569;white-space:nowrap}.calendar-date.chosen{background:#172033;color:#fff}.calendar-date.chosen small{color:#fbbf24}.calendar-date.today{outline:2px solid #f59e0b}
+.schedule-job{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:#fff;border:1px solid #cbd5e1;margin:8px 0;padding:16px;box-shadow:0 2px 8px #00000009}
+.schedule-job span{min-width:0}.schedule-job small{display:block;font-weight:400;margin-top:3px;color:#64748b;overflow-wrap:anywhere}.job-time{text-align:right;white-space:nowrap;font-size:13px}.unscheduled{border-top:1px solid #ddd;margin-top:20px}
+.job-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.job-detail-grid>div{background:#f1f5f9;padding:13px;border-radius:10px;overflow-wrap:anywhere}.job-detail-grid small{display:block}.job-detail-grid b{display:block;margin-top:4px}
+.job-description{white-space:pre-wrap}.job-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}.job-buttons button{margin:0}.job-finish{background:#15803d;color:white}.muted{color:#64748b}
+@media(max-width:560px){.job-detail-grid{grid-template-columns:1fr}.schedule-job{padding:12px}.job-buttons{grid-template-columns:1fr}.calendar-date{min-height:51px}.calendar-date small{font-size:9px}}
 </style></head>
 <body><header><div><strong>BYGGAPP</strong><div>Personal</div></div><button class="secondary" onclick="logout()">Logga ut</button></header>
-<main><p id="identity"></p><p id="message" role="status"></p>
-<section class="card daily-card" aria-labelledby="daily-title">
+<main>
+<p id="identity"></p><p id="message" role="status"></p>
+<nav class="staff-nav" aria-label="Personalens sidor">
+<button type="button" data-view="day" onclick="staffNavigate('day')">Min arbetsdag</button>
+<button type="button" data-view="schedule" onclick="staffNavigate('schedule')">Schema</button>
+<button type="button" data-view="history" onclick="staffNavigate('history')">Historik</button>
+</nav>
+<div id="screenDay" class="staff-screen"><section class="card daily-card" aria-labelledby="daily-title">
 <h2 id="daily-title">Min arbetsdag</h2>
 <p class="daily-subtitle">Daglig stämpelklocka – helt separat från arbetsorder och projekt.</p>
 <div id="dailyStatus" class="daily-status" role="status">Hämtar status…</div>
@@ -34,12 +52,20 @@
 <button class="daily-stop" id="dailyStop" onclick="dailyAction('stop')" disabled>■ Avsluta dagen</button>
 </div>
 <p id="dailyError" class="error" role="alert"></p>
-<h3>Min historik</h3><div id="dailyHistory">Hämtar historik…</div>
-</section>
-<section class="card" id="jobflow"><h2>📋 Mina schemalagda jobb</h2><p><strong>Ordning:</strong> pågående jobb först, sedan nästa schemalagda jobb. Avslutade jobb sist.</p><p>Välj jobbet du blivit tilldelad av administratören. Projekttiden registreras separat från din dagliga stämpelklocka.</p><div id="jobflowList">Hämtar tilldelade jobb…</div><div id="jobflowEditor" style="display:none;border-top:1px solid #ddd;margin-top:16px;padding-top:16px"><h3 id="jobflowTitle">Slutför arbete</h3><label>Vad har du gjort?<textarea id="jobflowDescription" maxlength="5000" rows="5" style="width:100%;padding:12px" placeholder="Beskriv arbetet, felsökning och åtgärder"></textarea></label><h3>Material som använts</h3><div id="jobflowMaterials"></div><button class="secondary" onclick="jobflowAddMaterial()">+ Lägg till materialrad</button><h3>Bilder från jobbet (max 6)</h3><input id="jobflowFile" type="file" accept="image/jpeg,image/png,image/webp" multiple><button class="secondary" onclick="jobflowUploadPhotos()">Ladda upp bilder</button><div id="jobflowPhotoList"></div><p class="error" id="jobflowError" role="alert"></p><button style="background:#16a34a;color:white" onclick="jobflowComplete()">✓ Avsluta arbetet och skicka rapport</button><button class="secondary" onclick="jobflowClose()">Avbryt</button></div></section>
 
-<section class="card"><h2>Mina arbetstider</h2><div id="times"></div></section>
-<section class="card"><h2>Registrera material</h2><label>Arbetsorder<select id="materialproject"></select></label><label>Välj material<select id="catalog"></select></label><label>Materialnamn<input id="materialname" maxlength="250" placeholder="Exempel: Koppling 15 mm"></label><label>RSK-nummer<input id="rsk" maxlength="100"></label><label>Antal<input id="quantity" type="number" min="0.01" step="any" value="1"></label><label>Enhet<input id="unit" value="st" maxlength="20"></label><label>Källa<select id="source"><option value="vehicle">Servicebil</option><option value="supplier">Leverantör</option></select></label><label>Leverantör<input id="supplier" maxlength="150" placeholder="Exempel: Dahl"></label><button onclick="addMaterial()">Spara material</button><div id="materials"></div></section>
+</section></div>
+<div id="screenSchedule" class="staff-screen" hidden>
+<section class="card"><div class="calendar-head"><h2>Mitt schema</h2><div class="calendar-month"><button type="button" class="secondary" onclick="calendarMove(-1)" aria-label="Föregående månad">‹</button><strong id="calendarTitle"></strong><button type="button" class="secondary" onclick="calendarMove(1)" aria-label="Nästa månad">›</button></div></div>
+<p class="muted">Välj dag i kalendern. Du ser projektnummer, adress och schemalagd start- och sluttid.</p>
+<div class="calendar-grid" id="calendarGrid"></div>
+<h3 id="calendarDayTitle"></h3><div id="calendarDayJobs"></div></section>
+</div>
+<div id="screenJob" class="staff-screen" hidden>
+<section class="card"><button type="button" class="secondary" onclick="staffNavigate('schedule')">← Till schemat</button>
+<h2 id="jobDetailTitle">Arbetsorder</h2><div id="jobDetailContent"></div><div id="jobDetailActions"></div>
+<div id="jobflowEditor" style="display:none;border-top:1px solid #ddd;margin-top:16px;padding-top:16px"><h3 id="jobflowTitle">Slutför arbete</h3><label>Vad har du gjort?<textarea id="jobflowDescription" maxlength="5000" rows="5" style="width:100%;padding:12px" placeholder="Beskriv arbetet, felsökning och åtgärder"></textarea></label><h3>Material som använts</h3><div id="jobflowMaterials"></div><button class="secondary" onclick="jobflowAddMaterial()">+ Lägg till materialrad</button><h3>Bilder från jobbet (max 6)</h3><input id="jobflowFile" type="file" accept="image/jpeg,image/png,image/webp" multiple><button class="secondary" onclick="jobflowUploadPhotos()">Ladda upp bilder</button><div id="jobflowPhotoList"></div><p class="error" id="jobflowError" role="alert"></p><button style="background:#16a34a;color:white" onclick="jobflowComplete()">✓ Avsluta arbetet och skicka rapport</button><button class="secondary" onclick="jobflowClose()">Avbryt</button></div>
+</section></div>
+<div id="screenHistory" class="staff-screen" hidden><section class="card"><h2>Min historik</h2><p class="muted">Daglig närvaro och tidigare projekttider hålls separata.</p><h3>Arbetsdagar</h3><div id="dailyHistory">Hämtar historik…</div><h3>Projekttider</h3><div id="times"></div></section></div>
 </main><script>
 const token=sessionStorage.getItem('byggapp_token');if(!token)location.replace('/login');
 const $=id=>document.getElementById(id);
@@ -51,21 +77,16 @@ const date=s=>new Date(s).toLocaleString('sv-SE');
 let projects=[],times=[];
 async function refresh(){
  try{
-  const [me,t,m,cat]=await Promise.all([api('/api/me'),api('/api/staff/time'),api('/api/staff/materials'),api('/api/staff/catalog')]);
+  const [me,t]=await Promise.all([api('/api/me'),api('/api/staff/time')]);
   if(!['employee','contractor'].includes(me.role)){location.replace('/dashboard');return;}
   $('identity').textContent=(me.full_name||me.email)+' – '+me.company;
   times=t;
-  $('catalog').innerHTML='<option value="">Eget material</option>'+cat.map(v=>`<option value="${v.id}">${esc(v.name)} ${esc(v.rsk||'')}</option>`).join('');
-  $('catalog').onchange=()=>{const v=cat.find(v=>String(v.id)===$('catalog').value);if(v){$('materialname').value=v.name;$('rsk').value=v.rsk||'';$('unit').value=v.unit;}};
-  $('times').innerHTML=t.length?t.map(x=>`<div class="item"><b>${esc(x.project_title)}</b><div>${date(x.check_in)} – ${x.check_out?date(x.check_out):'Pågår'}</div><small>Rast: ${x.break_minutes||0} min · ${esc(x.work_type)}</small></div>`).join(''):'Inga tider registrerade';
-  $('materials').innerHTML=m.length?'<h3>Senast registrerat</h3>'+m.slice(0,15).map(x=>`<div class="item">${esc(x.name)} · ${esc(x.quantity)} ${esc(x.unit)} · ${esc(x.project_title)}</div>`).join(''):'';
+  $('times').innerHTML=t.length?t.map(x=>`<div class="item"><b>${esc(x.project_title)}</b><div>${date(x.check_in)} – ${x.check_out?date(x.check_out):'Pågår'}</div><small>Rast: ${x.break_minutes||0} min · ${esc(x.work_type)}</small></div>`).join(''):'Inga projekttider registrerade';
  }catch(e){show(e.message,true)}
 }
 async function resumeProject(id){try{await api('/api/staff/projects/'+id+'/resume',{method:'POST',body:'{}'});show('Projekt återupptaget');await refresh()}catch(e){show(e.message,true)}}
 async function stopClock(id){try{await api('/api/staff/time/'+id+'/stop',{method:'POST',body:JSON.stringify({})});show('Du är utcheckad');await refresh()}catch(e){show(e.message,true)}}
 async function endBreak(id){try{await api('/api/staff/time/'+id+'/break/stop',{method:'POST',body:'{}'});show('Rasten är avslutad')}catch(e){show(e.message,true)}}
-async function addMaterial(){try{await api('/api/staff/materials',{method:'POST',body:JSON.stringify({project_id:$('materialproject').value,name:$('materialname').value,rsk:$('rsk').value,quantity:Number($('quantity').value),unit:$('unit').value,source:$('source').value,supplier:$('supplier').value})});$('materialname').value='';$('rsk').value='';show('Material sparat');await refresh()}catch(e){show(e.message,true)}}
-
 // Daglig stämpelklocka (fristående från projekttid)
 let dailyCurrent=null,dailyLoadedAt=0,dailyBusy=false;
 function dailyDuration(seconds){const n=Math.max(0,Math.floor(Number(seconds)||0));return String(Math.floor(n/3600)).padStart(2,'0')+':'+String(Math.floor(n%3600/60)).padStart(2,'0')}
@@ -115,13 +136,55 @@ dailyRefresh();
 
 // Tidsrapportering per tilldelad arbetsorder – separat från daglig närvaro.
 let jobflowJobs=[],jobflowSelected=null,jobflowBusy=false;
+let calendarMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let calendarSelected=localDateKey(new Date());
+let selectedJobId=null;
+function localDateKey(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function jobDay(j){return j.scheduled_start?localDateKey(new Date(j.scheduled_start)):null}
+function jobDone(j){return !!(j.reported||j.status==='completed'||j.status==='invoiced')}
+function jobClock(s){return s?new Date(s).toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}):'Ej angivet'}
+function staffNavigate(view){
+ const allowed=['day','schedule','job','history'];if(!allowed.includes(view))view='day';
+ if(view==='job'&&!selectedJobId)view='schedule';
+ for(const name of allowed){$('screen'+name[0].toUpperCase()+name.slice(1)).hidden=name!==view;}
+ document.querySelectorAll('[data-view]').forEach(b=>{const on=b.dataset.view===view||(view==='job'&&b.dataset.view==='schedule');b.classList.toggle('selected',on);b.setAttribute('aria-current',on?'page':'false')});
+ if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);
+ if(view==='schedule')renderCalendar();if(view==='job')renderJobDetail();
+ window.scrollTo({top:0,behavior:'instant'});
+}
+function calendarMove(steps){calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+steps,1);calendarSelected=localDateKey(calendarMonth);renderCalendar()}
+function selectCalendarDay(key){calendarSelected=key;renderCalendar()}
+function calendarJobRow(j){return `<button type="button" class="schedule-job" onclick="openJobDetail(${Number(j.id)})"><span><b>${esc(j.project_number)}</b><small>${esc(j.customer_address||'Adress saknas')}</small></span><span class="job-time">${jobClock(j.scheduled_start)} – ${jobClock(j.scheduled_end)}<small>${jobDone(j)?'Avslutat':j.active_break_id?'Pausat':j.active_time_id?'Pågår':'Öppna detaljer ›'}</small></span></button>`}
+function renderCalendar(){
+ const month=calendarMonth,yy=month.getFullYear(),mm=month.getMonth();
+ $('calendarTitle').textContent=month.toLocaleDateString('sv-SE',{month:'long',year:'numeric'});
+ const first=(new Date(yy,mm,1).getDay()+6)%7;
+ const days=new Date(yy,mm+1,0).getDate();
+ let html=['Mån','Tis','Ons','Tor','Fre','Lör','Sön'].map(x=>`<div class="calendar-weekday">${x}</div>`).join('');
+ for(let i=0;i<first;i++)html+='<span></span>';
+ for(let day=1;day<=days;day++){
+  const key=localDateKey(new Date(yy,mm,day)),jobs=jobflowJobs.filter(j=>jobDay(j)===key);
+  html+=`<button type="button" class="calendar-date ${key===calendarSelected?'chosen':''} ${key===localDateKey(new Date())?'today':''}" onclick="selectCalendarDay('${key}')" aria-label="${key}, ${jobs.length} jobb"><b>${day}</b>${jobs.length?`<small>${jobs.length} jobb</small>`:''}</button>`;
+ }
+ $('calendarGrid').innerHTML=html;
+ const jobs=jobflowJobs.filter(j=>jobDay(j)===calendarSelected).sort((a,b)=>(!!b.active_time_id-!!a.active_time_id)||new Date(a.scheduled_start)-new Date(b.scheduled_start));
+ $('calendarDayTitle').textContent=new Date(calendarSelected+'T12:00:00').toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long'});
+ let body=jobs.map(calendarJobRow).join('')||'<p class="muted">Inga schemalagda jobb denna dag.</p>';
+ const unscheduled=jobflowJobs.filter(j=>!j.scheduled_start&&!jobDone(j));
+ if(unscheduled.length)body+=`<div class="unscheduled"><h3>Jobb utan schematid</h3>${unscheduled.map(calendarJobRow).join('')}</div>`;
+ $('calendarDayJobs').innerHTML=body;
+}
+function openJobDetail(pid){selectedJobId=pid;jobflowClose();staffNavigate('job')}
+function renderJobDetail(){
+ const j=jobflowJobs.find(x=>x.id===selectedJobId);if(!j){staffNavigate('schedule');return}
+ $('jobDetailTitle').textContent=j.project_number+' – '+j.title;
+ $('jobDetailContent').innerHTML=`<div class="job-detail-grid"><div><small>Kund</small><b>${esc(j.customer_name||'Ej angiven')}</b></div><div><small>Adress</small><b>${esc(j.customer_address||'Ej angiven')}</b></div><div><small>Start</small><b>${j.scheduled_start?date(j.scheduled_start):'Ej angiven'}</b></div><div><small>Slut</small><b>${j.scheduled_end?date(j.scheduled_end):'Ej angiven'}</b></div></div><h3>Arbetsbeskrivning</h3><p class="job-description">${esc(j.description||'Ingen beskrivning inlagd.')}</p><p><strong>Status:</strong> ${jobDone(j)?'Avslutat':j.active_break_id?'Rast / paus':j.active_time_id?'Pågående':'Ej startat'}</p>`;
+ const active=!!j.active_time_id,paused=!!j.active_break_id,done=jobDone(j);
+ $('jobDetailActions').innerHTML=done?'<p class="ok">✓ Jobbet är rapporterat.</p>':`<div class="job-buttons"><button ${active?'disabled':''} onclick="jobflowStart(${j.id})">Starta arbete</button><button ${!active||paused?'disabled':''} onclick="jobflowBreak(${j.id},'start')">Pausa</button><button ${!active||!paused?'disabled':''} onclick="jobflowBreak(${j.id},'stop')">Fortsätt</button><button class="job-finish" ${!active||paused?'disabled':''} onclick="jobflowOpen(${j.id})">Avsluta och rapportera</button></div>`;
+}
 async function jobflowRefresh(){
- try{jobflowJobs=await api('/api/staff/jobflow');const box=$('jobflowList');const materialOptions=jobflowJobs.filter(j=>!j.reported && ['open','ongoing','paused'].includes(j.status));$('materialproject').innerHTML=materialOptions.map(j=>`<option value="${j.id}">${esc(j.project_number)} – ${esc(j.title)}</option>`).join('');
- box.innerHTML=jobflowJobs.length?jobflowJobs.map(j=>{
- const active=!!j.active_time_id,breakNow=!!j.active_break_id,done=j.reported||j.status==='completed'||j.status==='invoiced';
- return `<div class="item"><b>${esc(j.project_number)} – ${esc(j.title)}</b><div>${esc(j.customer_name||'')} · ${esc(j.customer_address||'')}</div><small>${j.scheduled_start?date(j.scheduled_start):'Ej schemalagt'} – ${j.scheduled_end?date(j.scheduled_end):'Ej bestämt'}</small><p>${esc(j.description||'')}</p><small>Status: ${done?'Rapporterat':breakNow?'Pausat':active?'Arbete pågår':'Ej startat'}</small><div>${done?'✓ Klart':`<button ${active?'disabled':''} onclick="jobflowStart(${j.id})">Starta arbete</button> <button ${!active||breakNow?'disabled':''} onclick="jobflowBreak(${j.id},'start')">Pausa</button> <button ${!active||!breakNow?'disabled':''} onclick="jobflowBreak(${j.id},'stop')">Fortsätt</button> <button ${!active||breakNow?'disabled':''} onclick="jobflowOpen(${j.id})">Avsluta jobb</button>`}</div></div>`;
- }).join(''):'Inga jobb är tilldelade till dig ännu.';
- }catch(e){$('jobflowList').textContent='Kunde inte hämta tilldelade jobb: '+e.message;}
+ try{jobflowJobs=await api('/api/staff/jobflow');renderCalendar();if(!$('screenJob').hidden)renderJobDetail()}
+ catch(e){show('Kunde inte hämta schemat: '+e.message,true)}
 }
 async function jobflowStart(pid){try{await api('/api/staff/time/start',{method:'POST',body:JSON.stringify({project_id:pid,work_type:'ordinary'})});show('Projektarbetet startat');await jobflowRefresh();await refresh()}catch(e){show(e.message,true)}}
 async function jobflowBreak(pid,action){const j=jobflowJobs.find(x=>x.id===pid);if(!j||!j.active_time_id)return;try{await api('/api/staff/time/'+j.active_time_id+'/break/'+action,{method:'POST',body:'{}'});show(action==='start'?'Arbetet pausat':'Arbetet fortsätter');await jobflowRefresh()}catch(e){show(e.message,true)}}
@@ -136,8 +199,9 @@ async function jobflowLoadPhotos(){if(!jobflowSelected)return;try{const photos=a
 async function jobflowDeletePhoto(id){if(!jobflowSelected)return;try{await api('/api/staff/jobs/'+jobflowSelected+'/photos/'+id,{method:'DELETE'});await jobflowLoadPhotos()}catch(e){$('jobflowError').textContent=e.message}}
 async function jobflowComplete(){if(!jobflowSelected||jobflowBusy)return;const description=$('jobflowDescription').value.trim();if(description.length<3){$('jobflowError').textContent='Skriv vad du gjort innan du avslutar.';return}
  const materials=[];for(const row of document.querySelectorAll('.jobflow-material')){const name=row.querySelector('.jm-name').value.trim(),quantity=row.querySelector('.jm-qty').value,unit=row.querySelector('.jm-unit').value,rsk=row.querySelector('.jm-rsk').value;if(!name&&!quantity)continue;if(!name||!(Number(quantity)>0)){$('jobflowError').textContent='Alla materialrader behöver namn och antal';return}materials.push({name,quantity:Number(quantity),unit,rsk})}
- if(!confirm('Avsluta projektarbetet och skicka rapporten till admin?'))return;jobflowBusy=true;try{await api('/api/staff/jobs/'+jobflowSelected+'/complete',{method:'POST',body:JSON.stringify({description,materials})});jobflowClose();show('Jobbet avslutat – rapport skickad till administratören');await jobflowRefresh();await refresh()}catch(e){$('jobflowError').textContent=e.message}finally{jobflowBusy=false}}
+ if(!confirm('Avsluta projektarbetet och skicka rapporten till admin?'))return;jobflowBusy=true;try{await api('/api/staff/jobs/'+jobflowSelected+'/complete',{method:'POST',body:JSON.stringify({description,materials})});jobflowClose();show('Jobbet avslutat – rapport skickad till administratören');await jobflowRefresh();await refresh();staffNavigate('schedule')}catch(e){$('jobflowError').textContent=e.message}finally{jobflowBusy=false}}
 jobflowRefresh();
-
+window.addEventListener('hashchange',()=>staffNavigate(location.hash.slice(1)));
+staffNavigate(location.hash.slice(1)||'day');
 refresh();
 </script></body></html>
