@@ -101,6 +101,7 @@ app.post('/api/staff/materials',staff,asyncRoute(async(req,res)=>{
 // All admin-API är server-skyddad och alltid företagsspecifik.
 require('./daily-attendance-routes')(app,db);
 require('./daily-attendance-admin-extra')(app,db);
+require('./jobflow-routes')(app,db);
 app.use('/api',admin);
 app.get('/api/overview',asyncRoute(async(req,res)=>{
  const c=tenant(req);const {rows}=await db.query(`SELECT (SELECT count(*) FROM customers WHERE company_id=$1)::int customers,(SELECT count(*) FROM projects WHERE company_id=$1)::int projects,(SELECT count(*) FROM app_users WHERE company_id=$1 AND active=true)::int users,(SELECT count(*) FROM time_entries WHERE company_id=$1 AND check_out IS NULL)::int active_clocks`,[c]);res.json(rows[0]);
@@ -308,9 +309,10 @@ app.post('/api/invoices/drafts/:id/send',asyncRoute(async(req,res)=>{
 app.use('/api',(req,res)=>fail(res,404,'API-adressen finns inte'));
 app.get('/login',(req,res)=>res.sendFile(path.join(__dirname,'../admin/index.html')));
 app.get('/dashboard',(req,res)=>res.sendFile(path.join(__dirname,'../admin/dashboard.html')));
+app.get('/jobbrapporter',(req,res)=>res.sendFile(path.join(__dirname,'../admin/jobbrapporter.html')));
 app.get('/narvaro',(req,res)=>res.sendFile(path.join(__dirname,'../admin/daglig-narvaro.html')));
 app.get('/personal',(req,res)=>res.sendFile(path.join(__dirname,'../admin/personal.html')));
 app.get('/',(req,res)=>res.redirect('/login'));
 app.use((err,req,res,next)=>{console.error('Serverfel:',err.code||err.message);if(err.code==='23505')return fail(res,409,'Uppgiften finns redan eller du är redan incheckad');if(err.code==='23503')return fail(res,409,'Posten används av andra uppgifter');if(err.code==='23514'||err.code==='22P02')return fail(res,400,'Ogiltiga uppgifter');return fail(res,500,'Serverfel');});
 const port=Number(process.env.PORT)||4000;
-app.listen(port,'0.0.0.0',()=>console.log('Byggapp körs på port '+port));
+app.listen(port,'0.0.0.0',()=>console.log('Byggapp: http://localhost:'+port+'/login'));
