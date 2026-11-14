@@ -313,4 +313,4 @@ app.get('/personal',(req,res)=>res.sendFile(path.join(__dirname,'../admin/person
 app.get('/',(req,res)=>res.redirect('/login'));
 app.use((err,req,res,next)=>{console.error('Serverfel:',err.code||err.message);if(err.code==='23505')return fail(res,409,'Uppgiften finns redan eller du är redan incheckad');if(err.code==='23503')return fail(res,409,'Posten används av andra uppgifter');if(err.code==='23514'||err.code==='22P02')return fail(res,400,'Ogiltiga uppgifter');return fail(res,500,'Serverfel');});
 const port=Number(process.env.PORT)||4000;
-app.listen(port,'127.0.0.1',()=>console.log('Byggapp: http://localhost:'+port+'/login'));
+app.listen(port,'0.0.0.0',()=>console.log('Byggapp körs på port '+port));
