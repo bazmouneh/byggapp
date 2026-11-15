@@ -131,6 +131,24 @@ module.exports=function(app,db){
   if(!report)return deny(res,404,'Rapport saknas');
   const {rows}=await db.query('SELECT m.name,m.quantity,m.unit,m.rsk FROM job_report_materials rm JOIN materials m ON m.id=rm.material_id AND m.company_id=$2 WHERE rm.report_id=$1 ORDER BY m.id',[validId(req.params.id),company(req)]);res.json(rows);
  }));
+  // Admin får komplettera en redan inskickad rapport med saknade bilder.
+  app.post('/api/job-reports/:id/photos',express.raw({type:['image/jpeg','image/png','image/webp'],limit:'2mb'}),wrap(async(req,res)=>{
+   if(req.user.role!=='admin')return deny(res,403,'Endast administratör');
+   const reportId=validId(req.params.id);
+   const {rows:[report]}=await db.query('SELECT project_id,user_id FROM job_reports WHERE id=$1 AND company_id=$2',[reportId,company(req)]);
+   if(!report)return deny(res,404,'Rapport saknas');
+   const type=req.headers['content-type']?.split(';')[0],data=req.body;
+   if(!Buffer.isBuffer(data)||!data.length||data.length>2*1024*1024)return deny(res,400,'Bilden saknas eller är större än 2 MB');
+   const jpeg=type==='image/jpeg'&&data[0]===255&&data[1]===216&&data[2]===255;
+   const png=type==='image/png'&&data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+   const webp=type==='image/webp'&&data.toString('ascii',0,4)==='RIFF'&&data.toString('ascii',8,12)==='WEBP';
+   if(!jpeg&&!png&&!webp)return deny(res,400,'Endast JPG, PNG och WebP');
+   const {rows}=await db.query(`INSERT INTO job_photos(company_id,project_id,user_id,content_type,photo_data)
+     SELECT $1,$2,$3,$4,$5 WHERE (SELECT count(*) FROM job_photos WHERE company_id=$1 AND project_id=$2 AND user_id=$3)<6 RETURNING id`,
+     [company(req),report.project_id,report.user_id,type,data]);
+   if(!rows.length)return deny(res,409,'Max 6 bilder på jobbet');
+   res.status(201).json(rows[0]);
+  }));
  app.get('/api/job-reports/:id/photos',wrap(async(req,res)=>{
   if(req.user.role!=='admin')return deny(res,403,'Endast administratör');
   const {rows:[report]}=await db.query('SELECT project_id,user_id FROM job_reports WHERE id=$1 AND company_id=$2',[validId(req.params.id),company(req)]);
