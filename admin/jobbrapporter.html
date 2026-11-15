@@ -1,8 +1,73 @@
-<!doctype html><html lang="sv"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Byggapp – Jobbrapporter</title><style>body{font:16px system-ui;background:#f1f5f9;color:#172033;margin:0}header{background:#101827;color:white;padding:20px}main{max-width:1080px;margin:auto;padding:20px}.card{background:white;padding:20px;border-radius:14px;margin:15px 0;box-shadow:0 3px 12px #0001}button,a{background:#fbbf24;color:#111827;border:0;padding:10px 14px;border-radius:7px;display:inline-block;text-decoration:none;cursor:pointer}.photo{max-width:190px;max-height:160px;border-radius:6px;margin:5px}p{white-space:pre-wrap}small{color:#64748b}</style><header><b>BYGGAPP – Slutförda arbetsorder</b> <a href="/dashboard">Till adminpanelen</a></header><main><h1>Jobbrapporter från personalen</h1><div id="reports">Hämtar rapporter…</div></main><script>
+<!doctype html><html lang="sv"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Byggapp – Jobbrapporter</title><style>body{font:16px system-ui;background:#f1f5f9;color:#172033;margin:0}header{background:#101827;color:white;padding:20px}main{max-width:1080px;margin:auto;padding:20px}.card{background:white;padding:20px;border-radius:14px;margin:15px 0;box-shadow:0 3px 12px #0001}button,a{background:#fbbf24;color:#111827;border:0;padding:10px 14px;border-radius:7px;display:inline-block;text-decoration:none;cursor:pointer}.photo{max-width:190px;max-height:160px;border-radius:6px;margin:5px}p{white-space:pre-wrap}small{color:#64748b}
+.photo-grid{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px}
+.photo-item{width:180px;max-width:100%;display:flex;flex-direction:column;gap:7px;border:1px solid #e2e8f0;border-radius:10px;padding:8px;background:#f8fafc}
+.photo-open{background:transparent;border:0;padding:0;margin:0;display:block;cursor:zoom-in}
+.photo-open img{width:100%;height:145px;object-fit:contain;border-radius:6px;display:block}
+.photo-download{display:block;text-align:center;background:#fbbf24;color:#111827;font-size:14px;font-weight:650}
+.photo-dialog{position:fixed;inset:0;background:rgba(2,6,23,.94);z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px}
+.photo-dialog.show{display:flex}
+.photo-dialog img{max-width:95vw;max-height:78vh;object-fit:contain;box-shadow:0 10px 30px #0008}
+.photo-dialog .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.photo-dialog .close-btn{background:white}
+.photo-dialog button,.photo-dialog a{font-size:16px}
+@media(max-width:480px){.photo-item{width:calc(50% - 7px)}.photo-open img{height:115px}}
+</style><header><b>BYGGAPP – Slutförda arbetsorder</b> <a href="/dashboard">Till adminpanelen</a></header><main><h1>Jobbrapporter från personalen</h1><div id="reports">Hämtar rapporter…</div></main><div id="photo-dialog" class="photo-dialog" role="dialog" aria-modal="true" aria-label="Visa jobbfoto" aria-hidden="true"><img id="photo-large" alt="Förstorad jobbild"><div class="actions"><a id="photo-dialog-download" href="#" download="jobbfoto.jpg">Ladda ner bilden</a><button class="close-btn" type="button" onclick="closePhoto()">Stäng ✕</button></div></div><script>
 const token=sessionStorage.getItem('byggapp_token');if(!token)location.replace('/login');const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(p){const r=await fetch('/api/'+p,{headers:{Authorization:'Bearer '+token}});if(r.status===401){location.replace('/login');throw Error('Logga in igen')}const d=await r.json();if(!r.ok)throw Error(d.error||'Fel');return d}
-async function load(){try{const rows=await api('job-reports');document.getElementById('reports').innerHTML=rows.map(x=>`<section class="card"><h2>${safe(x.project_number)} – ${safe(x.title)}</h2><small>${safe(x.full_name||x.email)} · ${new Date(x.completed_at).toLocaleString('sv-SE')} · ${(Number(x.worked_minutes)/60).toFixed(2)} projekttimmar</small><p>${safe(x.description)}</p><button onclick="details(${x.id},this)">Visa material och bilder (${x.photo_count})</button><div class="detail"></div><div style="margin-top:12px"><label>Komplettera med bilder (JPG/PNG/WebP, max 2 MB per bild): <input type="file" accept="image/jpeg,image/png,image/webp" multiple id="files-${x.id}"></label><button onclick="addReportPhotos(${x.id},this)">Ladda upp saknade bilder</button><small class="upload-status"></small></div></section>`).join('')||'<p>Inga slutförda jobb ännu.</p>'}catch(e){document.getElementById('reports').textContent=e.message}}
-async function details(id,button){const target=button.parentElement.querySelector('.detail');try{const [materials,photos]=await Promise.all([api('job-reports/'+id+'/materials'),api('job-reports/'+id+'/photos')]);target.innerHTML='<h3>Material på arbetsordern</h3>'+ (materials.map(m=>`<div>${safe(m.name)} – ${safe(m.quantity)} ${safe(m.unit)} ${m.rsk?'(RSK '+safe(m.rsk)+')':''}</div>`).join('')||'Inget material')+'<h3>Bilder</h3>';for(const p of photos){const r=await fetch('/api/job-photos/'+p.id,{headers:{Authorization:'Bearer '+token}});if(!r.ok)continue;const url=URL.createObjectURL(await r.blob());const img=document.createElement('img');img.className='photo';img.alt='Jobbfoto';img.src=url;img.onload=()=>URL.revokeObjectURL(url);target.appendChild(img)}}catch(e){target.textContent=e.message}}
+async function load(){clearPhotoUrls();try{const rows=await api('job-reports');document.getElementById('reports').innerHTML=rows.map(x=>`<section class="card"><h2>${safe(x.project_number)} – ${safe(x.title)}</h2><small>${safe(x.full_name||x.email)} · ${new Date(x.completed_at).toLocaleString('sv-SE')} · ${(Number(x.worked_minutes)/60).toFixed(2)} projekttimmar</small><p>${safe(x.description)}</p><button onclick="details(${x.id},this)">Visa material och bilder (${x.photo_count})</button><div class="detail"></div><div style="margin-top:12px"><label>Komplettera med bilder (JPG/PNG/WebP, max 2 MB per bild): <input type="file" accept="image/jpeg,image/png,image/webp" multiple id="files-${x.id}"></label><button onclick="addReportPhotos(${x.id},this)">Ladda upp saknade bilder</button><small class="upload-status"></small></div></section>`).join('')||'<p>Inga slutförda jobb ännu.</p>'}catch(e){document.getElementById('reports').textContent=e.message}}
+// Bildfilerna hämtas via skyddat API (Bearer token); vanliga bildlänkar fungerar inte här.
+const photoObjectUrls=new Set();
+function rememberPhotoUrl(url){photoObjectUrls.add(url);return url}
+function clearPhotoUrls(){closePhoto();for(const url of photoObjectUrls)URL.revokeObjectURL(url);photoObjectUrls.clear()}
+window.addEventListener('pagehide',clearPhotoUrls);
+function openPhoto(url,filename){
+ const dialog=document.getElementById('photo-dialog');
+ document.getElementById('photo-large').src=url;
+ const download=document.getElementById('photo-dialog-download');download.href=url;download.download=filename;
+ dialog.classList.add('show');dialog.setAttribute('aria-hidden','false');
+ dialog.querySelector('.close-btn').focus();
+}
+function closePhoto(){
+ const dialog=document.getElementById('photo-dialog');
+ if(!dialog)return;
+ dialog.classList.remove('show');dialog.setAttribute('aria-hidden','true');
+ document.getElementById('photo-large').removeAttribute('src');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePhoto()});
+document.getElementById('photo-dialog').addEventListener('click',e=>{if(e.target.id==='photo-dialog')closePhoto()});
+async function details(id,button){
+ const target=button.parentElement.querySelector('.detail');
+ if(target.dataset.loaded==='true'){
+  target.hidden=!target.hidden;button.textContent=target.hidden?'Visa material och bilder':'Dölj material och bilder';return;
+ }
+ button.disabled=true;target.textContent='Hämtar material och bilder…';
+ try{
+  const [materials,photos]=await Promise.all([api('job-reports/'+id+'/materials'),api('job-reports/'+id+'/photos')]);
+  target.innerHTML='<h3>Material på arbetsordern</h3>'+
+   (materials.map(m=>`<div>${safe(m.name)} – ${safe(m.quantity)} ${safe(m.unit)} ${m.rsk?'(RSK '+safe(m.rsk)+')':''}</div>`).join('')||'Inget material')+'<h3>Bilder</h3>';
+  const grid=document.createElement('div');grid.className='photo-grid';target.appendChild(grid);
+  if(!photos.length){grid.textContent='Inga bilder uppladdade';}
+  for(let i=0;i<photos.length;i++){
+   const p=photos[i];
+   try{
+    const r=await fetch('/api/job-photos/'+encodeURIComponent(p.id),{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)throw Error('Kunde inte hämta bilden');
+    const blob=await r.blob();
+    const format=blob.type.includes('png')?'png':blob.type.includes('webp')?'webp':'jpg';
+    const filename='arbetsorder-'+id+'-bild-'+(i+1)+'.'+format;
+    const url=rememberPhotoUrl(URL.createObjectURL(blob));
+    const item=document.createElement('div');item.className='photo-item';
+    const open=document.createElement('button');open.type='button';open.className='photo-open';open.title='Visa bilden i stort';open.setAttribute('aria-label','Förstora bild '+(i+1));
+    const img=document.createElement('img');img.src=url;img.alt='Jobbfoto '+(i+1);img.loading='lazy';
+    open.appendChild(img);open.onclick=()=>openPhoto(url,filename);
+    const save=document.createElement('a');save.className='photo-download';save.href=url;save.download=filename;save.textContent='Ladda ner';
+    item.append(open,save);grid.appendChild(item);
+   }catch(err){const warning=document.createElement('p');warning.textContent='Bild '+(i+1)+' kunde inte hämtas: '+err.message;grid.appendChild(warning)}
+  }
+  target.dataset.loaded='true';target.hidden=false;button.textContent='Dölj material och bilder';
+ }catch(e){target.textContent='Fel: '+e.message}
+ finally{button.disabled=false}
+}
 async function addReportPhotos(id,button){
  const parent=button.parentElement,files=Array.from(document.getElementById('files-'+id).files),status=parent.querySelector('.upload-status');
  if(!files.length){status.textContent='Välj bilder först';return}
