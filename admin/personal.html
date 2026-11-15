@@ -31,27 +31,11 @@
 .job-description{white-space:pre-wrap}.job-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}.job-buttons button{margin:0}.job-finish{background:#15803d;color:white}.muted{color:#64748b}
 @media(max-width:560px){.job-detail-grid{grid-template-columns:1fr}.schedule-job{padding:12px}.job-buttons{grid-template-columns:1fr}.calendar-date{min-height:51px}.calendar-date small{font-size:9px}}
 </style><style id="byggapp360-brand-css">.byggapp360-brand{display:flex;align-items:center;gap:12px;flex-wrap:nowrap}.byggapp360-brand img{width:68px;height:68px;object-fit:contain;flex-shrink:0}.byggapp360-brand .byggapp360-word{font-size:23px;font-weight:800;color:#fbbf24;letter-spacing:-.4px}.byggapp360-loginbrand{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:14px}.byggapp360-loginbrand img{width:160px;max-width:100%;height:auto}.byggapp360-loginbrand span{font-weight:800;font-size:24px;color:#fbbf24}@media(max-width:530px){.byggapp360-brand img{width:44px;height:44px}.byggapp360-brand .byggapp360-word{font-size:19px}}</style><style id="byggapp360-full-logo-style">
-.byggapp360-full-logo{display:block;width:205px;max-width:100%;height:auto;object-fit:contain}
-.byggapp360-brand,.byggapp360-loginbrand{display:flex;align-items:center;justify-content:center;margin:0;gap:0}
-.byggapp360-loginbrand .byggapp360-full-logo{width:270px;max-width:100%;margin:0 auto}
-@media(max-width:530px){.byggapp360-brand .byggapp360-full-logo{width:160px}.byggapp360-loginbrand .byggapp360-full-logo{width:225px}}
-</style>
-<style id="byggapp360-light-theme-v1">
-/* Byggapp 360 – ljus design anpassad till originalets mörkblå/orange transparenta logotyp. */
-html,body{background:#edf3fa!important;color:#162b40!important}
-header{background:#f8fbff!important;color:#162b40!important;border-bottom:1px solid #d7e2ef;box-shadow:0 2px 12px #122e4812!important}
-header a:not(.btn),header strong,header b,header div,header span{color:#162b40}
-header a{background:#e5eef8!important;color:#162b40!important}
-nav{background:#e2ebf5!important;border-bottom:1px solid #d0dfef}
-nav button:not(.active){color:#1d354d!important}
-nav button:not(.active):hover{background:#cfdff0!important}
-main .panel,main .card,.box{background:#ffffff!important;color:#162b40;box-shadow:0 5px 22px #163c6010}
-.box{border:1px solid #dbe5f1}
-body:has(.box)>.box{width:min(400px,90vw)}
-input,select,textarea{background:#fff!important;color:#172b40!important;border-color:#c5d3e2!important}
-input::placeholder,textarea::placeholder{color:#6a7d90}
-.byggapp360-brand,.byggapp360-loginbrand{background:transparent!important}
-.byggapp360-full-logo{filter:none!important}
+/* Large full-width logo on dark background. */
+.byggapp360-full-logo{display:block;width:520px;max-width:min(100%,calc(100vw - 32px));height:auto;object-fit:contain;flex-shrink:1}
+.byggapp360-brand,.byggapp360-loginbrand{display:flex;align-items:center;justify-content:center;margin:0;gap:0;max-width:100%;min-width:0}
+.byggapp360-loginbrand .byggapp360-full-logo{width:600px;max-width:min(100%,calc(100vw - 32px));margin:0 auto}
+@media(max-width:530px){.byggapp360-brand .byggapp360-full-logo{width:350px;max-width:calc(100vw - 32px)}.byggapp360-loginbrand .byggapp360-full-logo{width:450px;max-width:calc(100vw - 32px)}}
 </style>
 </head>
 <body><header><div><div class="byggapp360-brand"><img class="byggapp360-full-logo" src="/assets/byggapp360-logo.png" alt="Byggapp 360" /></div><div>Personal</div></div><button class="secondary" onclick="logout()">Logga ut</button></header>
