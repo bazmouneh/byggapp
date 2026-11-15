@@ -103,6 +103,7 @@ require('./daily-attendance-routes')(app,db);
 require('./daily-attendance-admin-extra')(app,db);
 require('./jobflow-routes')(app,db);
 app.use('/api',admin);
+const checkProjectMaterialReview=require('./material-pricing-routes')(app,db);
 require('./quote-routes')(app,db);
 app.get('/api/overview',asyncRoute(async(req,res)=>{
  const c=tenant(req);const {rows}=await db.query(`SELECT (SELECT count(*) FROM customers WHERE company_id=$1)::int customers,(SELECT count(*) FROM projects WHERE company_id=$1)::int projects,(SELECT count(*) FROM app_users WHERE company_id=$1 AND active=true)::int users,(SELECT count(*) FROM time_entries WHERE company_id=$1 AND check_out IS NULL)::int active_clocks`,[c]);res.json(rows[0]);
@@ -141,7 +142,7 @@ async function invoiceData(projectId,companyId,withRot=false){
  const {rows:[acceptedQuote]}=await db.query("SELECT * FROM project_quotes WHERE company_id=$1 AND project_id=$2 AND status='accepted' ORDER BY id DESC LIMIT 1",[companyId,projectId]);
  const actualMinutes=time.reduce((sum,t)=>sum+Math.max(0,(new Date(t.check_out)-new Date(t.check_in))/60000-num(t.break_minutes)),0);
  const billableMinutes=time.length?Math.max(num(p.min_billable_minutes),Math.ceil(actualMinutes/30)*30):0;
- const quoteMaterials=acceptedQuote?acceptedQuote.material_rows:materials;
+ const quoteMaterials=materials.length?materials:(acceptedQuote?acceptedQuote.material_rows:materials);
  const labor=acceptedQuote?Number(acceptedQuote.labor_amount):(p.billing_mode==='fixed'?num(p.fixed_price):billableMinutes/60*num(p.hourly_price));
  const materialTotal=quoteMaterials.reduce((sum,m)=>sum+num(m.quantity)*num(m.unit_price),0);
  const vehicleCharge=acceptedQuote?Number(acceptedQuote.other_amount):num(p.vehicle_charge);
@@ -235,7 +236,7 @@ app.post('/api/payroll/payslip',asyncRoute(async(req,res)=>{
  res.type('application/pdf');res.set('Content-Disposition','attachment; filename="lonespecifikation-utkast.pdf"');res.send(pdf);
 }));
 app.get('/api/invoices/preview/:id',asyncRoute(async(req,res)=>{const result=await invoiceData(id(req.params.id),tenant(req),req.query.rot==='true');if(!result)return fail(res,404,'Arbetsordern saknas');res.json(result);}));
-app.post('/api/invoices/drafts/:id',asyncRoute(async(req,res)=>{const d=await invoiceData(id(req.params.id),tenant(req),req.body?.rot===true);if(!d)return fail(res,404,'Arbetsordern saknas');
+app.post('/api/invoices/drafts/:id',asyncRoute(async(req,res)=>{const projectId=id(req.params.id);if(!projectId)return fail(res,400,'Ogiltig arbetsorder');if(!await checkProjectMaterialReview(tenant(req),projectId))return fail(res,409,'Granska och spara materialpriser före fakturering.');const d=await invoiceData(id(req.params.id),tenant(req),req.body?.rot===true);if(!d)return fail(res,404,'Arbetsordern saknas');
  if(d.quoteId&&!['completed','invoiced'].includes(d.project.status))return fail(res,409,'Arbetsordern måste vara avslutad innan accepterad offert faktureras');
  if(d.withRot){
   const pn=String(req.body?.rot_personnummer||'').replace(/[^0-9]/g,'');
@@ -309,7 +310,14 @@ app.get('/api/invoices/drafts/:id/pdf',asyncRoute(async(req,res)=>{
  const pdf=await invoiceDocument(i,{...i,company_name:i.company_name},{name:i.customer_name,address:i.customer_address,email:i.customer_email});
  res.set('Content-Type','application/pdf');res.set('Content-Disposition',`attachment; filename="faktura-${i.invoice_number}.pdf"`);res.send(pdf);
 }));
-app.post('/api/invoices/drafts/:id/send',asyncRoute(async(req,res)=>{
+app.post('/api/invoices/drafts/:id/send',asyncRoute(async(req,res)=>{const previousDraft=await db.query('SELECT project_id,details FROM invoice_drafts WHERE id=$1 AND company_id=$2',[id(req.params.id),tenant(req)]);
+ if(previousDraft.rowCount){const pid=Number(previousDraft.rows[0].project_id);
+  if(!await checkProjectMaterialReview(tenant(req),pid))return fail(res,409,'Materialpriser har inte granskats – fakturan kan inte skickas.');
+  const {rows:actual}=await db.query('SELECT name,quantity,unit,unit_price FROM materials WHERE company_id=$1 AND project_id=$2',[tenant(req),pid]);
+  const billed=previousDraft.rows[0].details?.materials||[];
+  const normalize=items=>items.map(x=>[String(x.name),Number(x.quantity),String(x.unit),Number(x.unit_price)]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  if(actual.length&&JSON.stringify(normalize(actual))!==JSON.stringify(normalize(billed)))return fail(res,409,'Fakturautkastet innehåller andra materialpriser än de granskade. Skapa nytt utkast.');
+ }
  if(req.body?.confirm!==true)return fail(res,400,'Bekräfta utskick av fakturan');
  const i=await getInvoice(id(req.params.id),tenant(req));if(!i)return fail(res,404,'Fakturan saknas');
  if(i.status==='sent')return fail(res,409,'Fakturan är redan skickad');
@@ -324,6 +332,7 @@ app.post('/api/invoices/drafts/:id/send',asyncRoute(async(req,res)=>{
 
 app.use('/api',(req,res)=>fail(res,404,'API-adressen finns inte'));
 app.get('/login',(req,res)=>res.sendFile(path.join(__dirname,'../admin/index.html')));
+app.get('/material-pricing-admin.js',(req,res)=>res.sendFile(path.join(__dirname,'../admin/material-pricing-admin.js')));
 app.get('/dashboard',(req,res)=>res.sendFile(path.join(__dirname,'../admin/dashboard.html')));
 app.get('/jobbrapporter',(req,res)=>res.sendFile(path.join(__dirname,'../admin/jobbrapporter.html')));
 app.get('/narvaro',(req,res)=>res.sendFile(path.join(__dirname,'../admin/daglig-narvaro.html')));

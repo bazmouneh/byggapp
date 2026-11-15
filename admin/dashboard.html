@@ -77,4 +77,5 @@ if(tab==='Fakturering'){
 }catch(err){view.innerHTML='<div class="panel">Fel: '+safe(err.message)+'</div>'}}
 (async()=>{try{const me=await api('/me');if(me.role!=='admin'){logout();return}el('company').textContent=me.company+' – '+me.email;await show('Översikt')}catch(e){notice(e.message)}})();
 </script><a id="daily-attendance-admin-link" href="/narvaro" style="position:fixed;right:18px;bottom:18px;z-index:1000;background:#f59e0b;color:#101827;padding:13px 17px;border-radius:12px;text-decoration:none;font:700 15px system-ui;box-shadow:0 4px 20px #0004">Daglig narvaro</a>
+<script src="/material-pricing-admin.js" defer></script>
 </body></html>
