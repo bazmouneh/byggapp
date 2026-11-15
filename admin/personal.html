@@ -209,4 +209,31 @@ jobflowRefresh();
 window.addEventListener('hashchange',()=>staffNavigate(location.hash.slice(1)));
 staffNavigate(location.hash.slice(1)||'day');
 refresh();
-</script></body></html>
+</script><script>
+/* staff-monthly-hours */
+(() => {
+ 'use strict';
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const fmt=n=>{n=Math.max(0,Math.round(Number(n)||0));return Math.floor(n/3600)+' tim '+String(Math.floor(n%3600/60)).padStart(2,'0')+' min'};
+ function setup(){
+  const target=document.getElementById('screenHistory');if(!target||document.getElementById('monthlyHours'))return;
+  const box=document.createElement('section');box.id='monthlyHours';box.className='card';
+  const today=new Date(),month=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+  box.innerHTML=`<h2>Mina arbetade timmar per månad</h2><p>Räknas från den dagliga stämpelklockan, inte från projekttider. Pågående pass räknas först efter utcheckning.</p><label>Välj månad <input type="month" id="monthHoursInput" value="${month}"></label><div id="monthHoursResult" role="status">Hämtar…</div>`;
+  target.insertBefore(box,target.firstChild);
+  const input=box.querySelector('input');input.addEventListener('change',load);load();
+  async function load(){
+   const host=document.getElementById('monthHoursResult');const selected=input.value;
+   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(selected))return;
+   host.textContent='Hämtar månadsrapport…';
+   try{const r=await fetch('/api/daily/monthly?month='+encodeURIComponent(selected),{headers:{Authorization:'Bearer '+sessionStorage.getItem('byggapp_token')}});const d=await r.json();if(!r.ok)throw Error(d.error||'Serverfel');if(input.value!==selected)return;
+    host.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:14px;margin:14px 0"><div><b>Arbetad tid</b><p style="font-size:24px;margin:4px 0">${fmt(d.total_seconds)}</p></div><div><b>Rast</b><p>${fmt(d.break_seconds)}</p></div><div><b>Avslutade pass</b><p>${Number(d.days)}</p></div></div>`+
+    (d.entries?.length?d.entries.map(x=>`<div class="item"><b>${esc(new Date(x.check_in).toLocaleDateString('sv-SE'))}</b> · ${fmt(x.worked_seconds)}<small style="display:block">${esc(new Date(x.check_in).toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}))}–${esc(new Date(x.check_out).toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}))} · Rast ${fmt(Number(x.break_seconds)+Number(x.manual_break_seconds))}</small></div>`).join(''):'<p>Inga avslutade arbetspass den här månaden.</p>');
+   }catch(e){host.textContent='Kunde inte hämta månadstimmar: '+e.message}
+  }
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);else setup();
+})();
+
+</script>
+</body></html>

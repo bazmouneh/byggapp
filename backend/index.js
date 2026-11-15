@@ -102,6 +102,7 @@ app.post('/api/staff/materials',staff,asyncRoute(async(req,res)=>{
 require('./daily-attendance-routes')(app,db);
 require('./daily-attendance-admin-extra')(app,db);
 require('./jobflow-routes')(app,db);
+require('./admin-material-monthly')(app,db);
 app.use('/api',admin);
 const checkProjectMaterialReview=require('./material-pricing-routes')(app,db);
 require('./quote-routes')(app,db);

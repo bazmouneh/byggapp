@@ -78,4 +78,51 @@ if(tab==='Fakturering'){
 (async()=>{try{const me=await api('/me');if(me.role!=='admin'){logout();return}el('company').textContent=me.company+' – '+me.email;await show('Översikt')}catch(e){notice(e.message)}})();
 </script><a id="daily-attendance-admin-link" href="/narvaro" style="position:fixed;right:18px;bottom:18px;z-index:1000;background:#f59e0b;color:#101827;padding:13px 17px;border-radius:12px;text-decoration:none;font:700 15px system-ui;box-shadow:0 4px 20px #0004">Daglig narvaro</a>
 <script src="/material-pricing-admin.js" defer></script>
+<script>
+/* admin-material-monthly */
+(() => {
+ 'use strict';
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const auth=()=>sessionStorage.getItem('byggapp_token');
+ const api=async(url,opt={})=>{const r=await fetch('/api'+url,{...opt,headers:{Authorization:'Bearer '+auth(),'Content-Type':'application/json',...(opt.headers||{})}});const data=await r.json();if(!r.ok)throw Error(data.error||'Kunde inte spara');return data};
+ let busy=false,attached=null;
+ function panel(){
+  const view=document.getElementById('view');
+  if(!view||!view.textContent.includes('Lägg till material'))return;
+  if(attached===view.querySelector('form')&&document.getElementById('adminMaterialEditor'))return;
+  const form=view.querySelector('form');if(!form)return;
+  attached=form;
+  const section=document.createElement('section');section.className='panel';section.id='adminMaterialEditor';
+  section.innerHTML='<h2>Ändra befintligt material</h2><p>Admin kan ändra materialnamn, antal, enhet, RSK, leverantör och priser. Lägg till nytt material i formuläret ovan.</p><div id="editMaterialNotice" role="status"></div><div id="editMaterialRows">Hämtar…</div>';
+  view.appendChild(section);load();
+ }
+ async function load(){
+  const host=document.getElementById('editMaterialRows');if(!host||busy)return;
+  try{
+   const rows=await api('/materials');if(!document.contains(host))return;
+   host.innerHTML=rows.length?rows.map(m=>`<form class="material-edit-line" data-id="${Number(m.id)}" style="border:1px solid #ddd;border-radius:10px;padding:14px;margin:10px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+     <div style="grid-column:1/-1"><b>${esc(m.project_title||'Arbetsorder')}</b></div>
+     <label>Material<input name="name" required maxlength="250" value="${esc(m.name)}"></label>
+     <label>Antal<input name="quantity" type="number" step="0.01" min="0.01" required value="${Number(m.quantity)}"></label>
+     <label>Enhet<input name="unit" maxlength="20" value="${esc(m.unit||'st')}"></label>
+     <label>RSK<input name="rsk" maxlength="100" value="${esc(m.rsk||'')}"></label>
+     <label>Leverantör<input name="supplier" maxlength="150" value="${esc(m.supplier||'')}"></label>
+     <label>Kundpris/st<input name="unit_price" type="number" min="0" step="0.01" value="${Number(m.unit_price)||0}"></label>
+     <label>Inköpspris/st<input name="purchase_price" type="number" min="0" step="0.01" value="${Number(m.purchase_price)||0}"></label>
+     <button type="submit">Spara ändring</button>
+   </form>`).join(''):'Inget material registrerat än.';
+   host.querySelectorAll('form').forEach(f=>f.addEventListener('submit',async e=>{
+    e.preventDefault();if(busy)return;busy=true;
+    const b=Object.fromEntries(new FormData(f));
+    try{await api('/materials/'+f.dataset.id+'/edit',{method:'PUT',body:JSON.stringify(b)});document.getElementById('editMaterialNotice').textContent='Material uppdaterat. Granska materialpriserna igen före fakturering.';}
+    catch(err){document.getElementById('editMaterialNotice').textContent='Fel: '+err.message}
+    finally{busy=false}
+   }));
+  }catch(e){host.textContent=e.message}
+ }
+ new MutationObserver(()=>panel()).observe(document.body,{childList:true,subtree:true});
+ panel();
+})();
+
+</script>
 </body></html>
