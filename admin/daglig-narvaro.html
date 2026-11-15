@@ -8,7 +8,18 @@
 .byggapp360-loginbrand .byggapp360-full-logo{width:600px;max-width:min(100%,calc(100vw - 32px));margin:0 auto}
 @media(max-width:530px){.byggapp360-brand .byggapp360-full-logo{width:350px;max-width:calc(100vw - 32px)}.byggapp360-loginbrand .byggapp360-full-logo{width:450px;max-width:calc(100vw - 32px)}}
 </style>
-</head><body><header><div><div class="byggapp360-brand"><img class="byggapp360-full-logo" src="/assets/byggapp360-logo.png" alt="Byggapp 360" /></div><div>Admin · Närvaro och rapporter</div></div><a href="/dashboard">Till adminpanelen</a></header>
+<style id="byggapp360-logo-size-fix">
+/* Explicitly override the legacy 68px / 44px header icon rules. */
+header .byggapp360-brand, .byggapp360-brand {display:flex;align-items:center;justify-content:flex-start;gap:0;min-width:0;max-width:100%;}
+header .byggapp360-brand img,header .byggapp360-brand img.byggapp360-full-logo,.byggapp360-brand img.byggapp360-full-logo {display:block!important;width:450px!important;height:auto!important;max-width:min(450px,calc(100vw - 165px))!important;max-height:none!important;object-fit:contain!important;flex:none!important;margin:0!important;}
+.byggapp360-brand .byggapp360-word {display:none!important;}
+.byggapp360-loginbrand {display:flex;align-items:center;justify-content:center;width:100%;max-width:100%;}
+.byggapp360-loginbrand img,.byggapp360-loginbrand img.byggapp360-full-logo {display:block!important;width:520px!important;height:auto!important;max-width:100%!important;max-height:none!important;object-fit:contain!important;}
+.byggapp360-loginbrand span {display:none!important;}
+@media (max-width:650px) {header .byggapp360-brand img,header .byggapp360-brand img.byggapp360-full-logo,.byggapp360-brand img.byggapp360-full-logo {width:290px!important;max-width:calc(100vw - 145px)!important;} }
+@media (max-width:390px) {header .byggapp360-brand img,header .byggapp360-brand img.byggapp360-full-logo,.byggapp360-brand img.byggapp360-full-logo {width:230px!important;max-width:calc(100vw - 135px)!important;} }
+</style>
+</head><body><header><div><div class="byggapp360-brand"><img class="byggapp360-full-logo" src="/assets/byggapp360-logo.png" alt="Byggapp 360"></div><div>Admin · Närvaro och rapporter</div></div><a href="/dashboard">Till adminpanelen</a></header>
 <main><h1>Daglig närvaro</h1><p class="muted">Stämpelklocka utan projektkoppling. Rättade uppgifter sparas med historik. Lönebelopp är preliminära.</p>
 <section class="card"><div class="controls"><label>Månad<input type="month" id="month"></label><label>Personal<select id="person"><option value="">Alla</option></select></label><button id="reload">Uppdatera</button></div><div class="actions"><button id="excel" class="outline">Ladda ner Excel</button><button id="pdf" class="outline">Ladda ner PDF</button><button id="csv" class="outline">Ladda ner CSV</button></div><p id="message" role="status"></p></section>
 <div class="stats"><div class="stat">Pågående pass<b id="present">0</b></div><div class="stat">Avslutade pass<b id="completed">0</b></div><div class="stat">Arbetad tid (avslutad)<b id="worked">0 h</b></div><div class="stat">Rast (avslutad)<b id="breaks">0 h</b></div></div>

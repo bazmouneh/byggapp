@@ -7,7 +7,18 @@
 .byggapp360-loginbrand .byggapp360-full-logo{width:600px;max-width:min(100%,calc(100vw - 32px));margin:0 auto}
 @media(max-width:530px){.byggapp360-brand .byggapp360-full-logo{width:350px;max-width:calc(100vw - 32px)}.byggapp360-loginbrand .byggapp360-full-logo{width:450px;max-width:calc(100vw - 32px)}}
 </style>
-</head><body><header><div><div class="byggapp360-brand"><img class="byggapp360-full-logo" src="/assets/byggapp360-logo.png" alt="Byggapp 360" /></div><div id="company">Administration</div></div><button onclick="logout()">Logga ut</button></header><nav id="nav"></nav><main><div id="message"></div><section id="view"></section></main><script>
+<style id="byggapp360-logo-size-fix">
+/* Explicitly override the legacy 68px / 44px header icon rules. */
+header .byggapp360-brand, .byggapp360-brand {display:flex;align-items:center;justify-content:flex-start;gap:0;min-width:0;max-width:100%;}
+header .byggapp360-brand img,header .byggapp360-brand img.byggapp360-full-logo,.byggapp360-brand img.byggapp360-full-logo {display:block!important;width:450px!important;height:auto!important;max-width:min(450px,calc(100vw - 165px))!important;max-height:none!important;object-fit:contain!important;flex:none!important;margin:0!important;}
+.byggapp360-brand .byggapp360-word {display:none!important;}
+.byggapp360-loginbrand {display:flex;align-items:center;justify-content:center;width:100%;max-width:100%;}
+.byggapp360-loginbrand img,.byggapp360-loginbrand img.byggapp360-full-logo {display:block!important;width:520px!important;height:auto!important;max-width:100%!important;max-height:none!important;object-fit:contain!important;}
+.byggapp360-loginbrand span {display:none!important;}
+@media (max-width:650px) {header .byggapp360-brand img,header .byggapp360-brand img.byggapp360-full-logo,.byggapp360-brand img.byggapp360-full-logo {width:290px!important;max-width:calc(100vw - 145px)!important;} }
+@media (max-width:390px) {header .byggapp360-brand img,header .byggapp360-brand img.byggapp360-full-logo,.byggapp360-brand img.byggapp360-full-logo {width:230px!important;max-width:calc(100vw - 135px)!important;} }
+</style>
+</head><body><header><div><div class="byggapp360-brand"><img class="byggapp360-full-logo" src="/assets/byggapp360-logo.png" alt="Byggapp 360"></div><div id="company">Administration</div></div><button onclick="logout()">Logga ut</button></header><nav id="nav"></nav><main><div id="message"></div><section id="view"></section></main><script>
 const tabs=['Översikt','Kunder','Arbetsorder','Offerter','Schema','Jobbrapporter','Personal','Tidrapportering','Löner','Material','Fakturering'];let current='Översikt';let customers=[],projects=[],users=[],times=[],materials=[];
 const token=sessionStorage.getItem('byggapp_token');if(!token)location.replace('/login');
 function logout(){sessionStorage.removeItem('byggapp_token');location.replace('/login')}
