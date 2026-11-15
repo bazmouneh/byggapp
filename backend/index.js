@@ -103,6 +103,7 @@ require('./daily-attendance-routes')(app,db);
 require('./daily-attendance-admin-extra')(app,db);
 require('./jobflow-routes')(app,db);
 app.use('/api',admin);
+require('./quote-routes')(app,db);
 app.get('/api/overview',asyncRoute(async(req,res)=>{
  const c=tenant(req);const {rows}=await db.query(`SELECT (SELECT count(*) FROM customers WHERE company_id=$1)::int customers,(SELECT count(*) FROM projects WHERE company_id=$1)::int projects,(SELECT count(*) FROM app_users WHERE company_id=$1 AND active=true)::int users,(SELECT count(*) FROM time_entries WHERE company_id=$1 AND check_out IS NULL)::int active_clocks`,[c]);res.json(rows[0]);
 }));
@@ -137,19 +138,22 @@ async function invoiceData(projectId,companyId,withRot=false){
  const {rows:[p]}=await db.query('SELECT * FROM projects WHERE id=$1 AND company_id=$2',[projectId,companyId]);if(!p)return null;
  const {rows:time}=await db.query('SELECT check_in,check_out,break_minutes,work_type FROM time_entries WHERE project_id=$1 AND company_id=$2 AND check_out IS NOT NULL',[projectId,companyId]);
  const {rows:materials}=await db.query('SELECT name,quantity,unit,unit_price FROM materials WHERE project_id=$1 AND company_id=$2',[projectId,companyId]);
+ const {rows:[acceptedQuote]}=await db.query("SELECT * FROM project_quotes WHERE company_id=$1 AND project_id=$2 AND status='accepted' ORDER BY id DESC LIMIT 1",[companyId,projectId]);
  const actualMinutes=time.reduce((sum,t)=>sum+Math.max(0,(new Date(t.check_out)-new Date(t.check_in))/60000-num(t.break_minutes)),0);
  const billableMinutes=time.length?Math.max(num(p.min_billable_minutes),Math.ceil(actualMinutes/30)*30):0;
- const labor=p.billing_mode==='fixed'?num(p.fixed_price):billableMinutes/60*num(p.hourly_price);
- const materialTotal=materials.reduce((sum,m)=>sum+num(m.quantity)*num(m.unit_price),0);
- const subtotal=Math.round((labor+materialTotal+num(p.vehicle_charge))*100)/100;
- const discount=Math.round(subtotal*num(p.discount_percent)/100*100)/100;
- // ROT är bara preliminär uppskattning, inte automatisk skattereduktion.
- // ROT 30 % av arbetskostnaden inklusive moms efter proportionell rabatt; aldrig material eller bil.
+ const quoteMaterials=acceptedQuote?acceptedQuote.material_rows:materials;
+ const labor=acceptedQuote?Number(acceptedQuote.labor_amount):(p.billing_mode==='fixed'?num(p.fixed_price):billableMinutes/60*num(p.hourly_price));
+ const materialTotal=quoteMaterials.reduce((sum,m)=>sum+num(m.quantity)*num(m.unit_price),0);
+ const vehicleCharge=acceptedQuote?Number(acceptedQuote.other_amount):num(p.vehicle_charge);
+ const discountPercent=acceptedQuote?Number(acceptedQuote.discount_percent):num(p.discount_percent);
+ const subtotal=Math.round((labor+materialTotal+vehicleCharge)*100)/100;
+ const discount=Math.round(subtotal*discountPercent)/100;
  const {rows:[vatConfig]}=await db.query('SELECT COALESCE(vat_percent,25) vat FROM company_invoice_settings WHERE company_id=$1',[companyId]);
- const vatRate=Number(vatConfig?.vat??25);
- const eligibleLabor=Math.max(0,labor*(1-num(p.discount_percent)/100));
+ const vatRate=acceptedQuote?Number(acceptedQuote.vat_rate):Number(vatConfig?.vat??25);
+ const eligibleLabor=Math.max(0,labor*(1-discountPercent/100));
  const rotDeduction=withRot?Math.round(eligibleLabor*(1+vatRate/100)*0.30*100)/100:0;
- return {project:p,actualMinutes:Math.round(actualMinutes*100)/100,billableMinutes,labor,materials,materialTotal,vehicleCharge:num(p.vehicle_charge),subtotal,discount,rotDeduction,total:Math.max(0,Math.round((subtotal-discount)*100)/100),withRot,vatRate,warning:'Preliminärt fakturaunderlag exklusive moms. Kontrollera moms, ROT-villkor och jourpriser manuellt.'};
+ const total=Math.max(0,Math.round((subtotal-discount)*100)/100);
+ return {project:p,quoteId:acceptedQuote?.id||null,actualMinutes:Math.round(actualMinutes*100)/100,billableMinutes,labor,materials:quoteMaterials,materialTotal,vehicleCharge,subtotal,discount,rotDeduction,total,withRot,vatRate,warning:'Preliminärt fakturaunderlag exklusive moms. ROT gäller bara godkänt arbete, inte material eller servicebil. Kontrollera kundens rätt till avdrag.'};
 }
 // Löneunderlag: faktisk tid minus rast, ingen kundavrundning. Bara admin.
 app.get('/api/payroll/summary',asyncRoute(async(req,res)=>{
@@ -231,7 +235,15 @@ app.post('/api/payroll/payslip',asyncRoute(async(req,res)=>{
  res.type('application/pdf');res.set('Content-Disposition','attachment; filename="lonespecifikation-utkast.pdf"');res.send(pdf);
 }));
 app.get('/api/invoices/preview/:id',asyncRoute(async(req,res)=>{const result=await invoiceData(id(req.params.id),tenant(req),req.query.rot==='true');if(!result)return fail(res,404,'Arbetsordern saknas');res.json(result);}));
-app.post('/api/invoices/drafts/:id',asyncRoute(async(req,res)=>{const d=await invoiceData(id(req.params.id),tenant(req),req.body?.rot===true);if(!d)return fail(res,404,'Arbetsordern saknas');const {rows}=await db.query("INSERT INTO invoice_drafts(company_id,project_id,subtotal,discount,rot_deduction,total,details,invoice_number) VALUES($1,$2,$3,$4,$5,$6,$7,'F-'||to_char(NOW(),'YYYY')||'-'||lpad(nextval('byggapp_invoice_seq')::text,6,'0')) RETURNING id,invoice_number,created_at",[tenant(req),id(req.params.id),d.subtotal,d.discount,d.rotDeduction,d.total,JSON.stringify(d)]);res.status(201).json(rows[0]);}));
+app.post('/api/invoices/drafts/:id',asyncRoute(async(req,res)=>{const d=await invoiceData(id(req.params.id),tenant(req),req.body?.rot===true);if(!d)return fail(res,404,'Arbetsordern saknas');
+ if(d.quoteId&&!['completed','invoiced'].includes(d.project.status))return fail(res,409,'Arbetsordern måste vara avslutad innan accepterad offert faktureras');
+ if(d.withRot){
+  const pn=String(req.body?.rot_personnummer||'').replace(/[^0-9]/g,'');
+  const property=text(req.body?.rot_property,150),apartment=text(req.body?.rot_apartment,100);
+  if(!/^\d{12}$/.test(pn)||!property)return fail(res,400,'Ange kundens personnummer (12 siffror) och fastighetsbeteckning eller bostadsrättsföreningens organisationsnummer');
+  if(d.labor<=0)return fail(res,400,'ROT kräver positiv arbetskostnad. Kontrollera projekttid eller accepterad offert.');
+  d.rotDetails={personnummer:pn,property,apartment};
+ }const {rows}=await db.query("INSERT INTO invoice_drafts(company_id,project_id,subtotal,discount,rot_deduction,total,details,invoice_number) VALUES($1,$2,$3,$4,$5,$6,$7,'F-'||to_char(NOW(),'YYYY')||'-'||lpad(nextval('byggapp_invoice_seq')::text,6,'0')) RETURNING id,invoice_number,created_at",[tenant(req),id(req.params.id),d.subtotal,d.discount,d.rotDeduction,d.total,JSON.stringify(d)]);res.status(201).json(rows[0]);}));
 app.get('/api/invoices/drafts',asyncRoute(async(req,res)=>{const {rows}=await db.query('SELECT i.id,i.project_id,i.total,i.created_at,i.invoice_number,i.status,p.project_number,p.title FROM invoice_drafts i JOIN projects p ON p.id=i.project_id AND p.company_id=i.company_id WHERE i.company_id=$1 ORDER BY i.id DESC LIMIT 200',[tenant(req)]);res.json(rows);}));
 
 const PDFDocument=require('pdfkit');
@@ -261,14 +273,18 @@ async function invoiceDocument(invoice,company,customer){
  for(const m of d.materials||[])row(m.name+' × '+m.quantity+' '+m.unit,Number(m.quantity)*Number(m.unit_price));
  if(Number(d.vehicleCharge))row('Servicebil',d.vehicleCharge);
  if(Number(d.discount))row('Rabatt',-Number(d.discount));
- const base=Number(d.total),vatRate=Number(company.vat_percent??25),vat=Math.round(base*vatRate)/100,rot=Number(d.rotDeduction||0),pay=Math.max(0,base+vat-rot);
+ const base=Number(d.total),vatRate=Number(d.vatRate??company.vat_percent??25),vat=Math.round(base*vatRate)/100,rot=Number(d.rotDeduction||0),pay=Math.max(0,base+vat-rot);
  if(y>588){doc.addPage();y=90;}else y=Math.max(y+10,523);
  doc.fillColor(ink).font('Helvetica').fontSize(10).text('Belopp exklusive moms',280,y,{width:150}).text(kr(base),435,y,{width:98,align:'right'});y+=24;
  doc.text('Moms '+vatRate+' %',280,y,{width:150}).text(kr(vat),435,y,{width:98,align:'right'});y+=24;
  if(rot>0){doc.text('Preliminärt ROT-avdrag',280,y,{width:150}).text('− '+kr(rot),435,y,{width:98,align:'right'});y+=27;}
  doc.roundedRect(48,y+12,499,65,8).fill(navy);doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(13).text('ATT BETALA',65,y+34).fontSize(20).text(kr(pay),290,y+30,{width:240,align:'right'});
  doc.fillColor(muted).font('Helvetica').fontSize(9).text('Bankgiro: '+(company.bankgiro||'Ej angivet')+'   •   Ange fakturanummer vid betalning',48,747,{width:499});
- if(rot>0)doc.fontSize(8).text('ROT-avdraget är preliminärt och förutsätter godkännande från Skatteverket.',48,766,{width:499});
+ if(rot>0){
+  const rd=d.rotDetails||{};
+  doc.fontSize(8).text('ROT (preliminärt): Kund '+(rd.personnummer||'saknas')+' · Fastighet/BRF '+(rd.property||'saknas')+(rd.apartment?' · Lägenhet '+rd.apartment:''),48,715,{width:499});
+  doc.fontSize(8).text('ROT-avdraget är preliminärt och förutsätter godkännande från Skatteverket.',48,766,{width:499});
+ }
  return pdfBuffer(doc);
 }
 async function getInvoice(idValue,companyId){
