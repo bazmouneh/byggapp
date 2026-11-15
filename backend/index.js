@@ -332,6 +332,11 @@ app.post('/api/invoices/drafts/:id/send',asyncRoute(async(req,res)=>{const previ
 }));
 
 app.use('/api',(req,res)=>fail(res,404,'API-adressen finns inte'));
+
+// Byggapp 360: publika logotyper (enbart statiska bilder).
+app.get('/assets/byggapp360-logo.png',(req,res)=>res.sendFile(path.join(__dirname,'../admin/assets/byggapp360-logo.png')));
+app.get('/assets/byggapp360-ikon.png',(req,res)=>res.sendFile(path.join(__dirname,'../admin/assets/byggapp360-ikon.png')));
+app.get('/assets/favicon.png',(req,res)=>res.sendFile(path.join(__dirname,'../admin/assets/favicon.png')));
 app.get('/login',(req,res)=>res.sendFile(path.join(__dirname,'../admin/index.html')));
 app.get('/material-pricing-admin.js',(req,res)=>res.sendFile(path.join(__dirname,'../admin/material-pricing-admin.js')));
 app.get('/dashboard',(req,res)=>res.sendFile(path.join(__dirname,'../admin/dashboard.html')));
